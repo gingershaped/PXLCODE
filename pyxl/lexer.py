@@ -14,6 +14,7 @@ keywords = (
     "U", # function end
     "SAY", # function end
     "SO", # function end
+    "FOUND", # function return
     'YARN',  # string type
     'NUMBR',  # integer type
     'NUMBAR',  # float type

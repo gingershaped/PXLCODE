@@ -2,20 +2,6 @@ from .parser import parse
 from .constants import *
 import traceback, sys
 
-class Function:
-    def __init__(self, interpreter, parameters, instructions):
-        self.instructions = instructions
-        self.vars = {}
-        self.funcs = {}
-        self.interpreter = interpreter
-        self.parameters = parameters
-    def execute(self, parameters):
-        if len(parameters) != len(self.parameters):
-            raise Exception("NOT ENUF PARAMETERS")
-        for c, p in enumerate(self.parameters):
-            self.vars[p[1][1]] = parameters[c]
-        self.interpreter.process_statements(self.instructions, self)
-
 class Interpreter(object):
     def __int__(self, ast):
         self.reset()
@@ -24,6 +10,7 @@ class Interpreter(object):
         self.vars = {}
         self.funcs = {}
         self.it = None
+        self.interpreter = self
 
     def interpret(self, ast):
         self.reset()
@@ -58,8 +45,8 @@ class Interpreter(object):
                 self.process_loop(value, context)
             if node_type == FUNCTION:
                 self.process_function(value, context)
-            if node_type == FUNCTION_CALL:
-                self.execute_function(value, context)
+            if node_type == FUNCTION_RETURN:
+                return self.process_return(value, context)
 
     def expr_res(self, res):
         self.it = res
@@ -67,6 +54,8 @@ class Interpreter(object):
 
     def process_expr(self, expr, context):
         node_type, value = expr
+        if node_type == FUNCTION_CALL:
+            return self.execute_function(value, context)
         if node_type == VALUE:
             return self.expr_res(self.process_value(value))
         if node_type == VAR:
@@ -76,13 +65,13 @@ class Interpreter(object):
         if node_type in [SIZE, ABSLUT]:
           return self.expr_res(self.process_unary(node_type, value))
         if node_type in [SUM, DIFF, PRODUKT, QUOSHUNT, MOD, BIGGR, SMALLR]:
-            return self.expr_res(self.process_math_expr(node_type, value))
+            return self.expr_res(self.process_math_expr(node_type, value, context))
         if node_type in [BOTH, EITHER, WON, NOT, ALL, ANY]:
-            return self.expr_res(self.process_logic_expr(node_type, value))
+            return self.expr_res(self.process_logic_expr(node_type, value, context))
         if node_type in [SAME, DIFFRINT]:
-            return self.expr_res(self.process_equality(node_type, value))
+            return self.expr_res(self.process_equality(node_type, value, context))
         if node_type == SMOOSH:
-            return self.expr_res(self.process_smoosh(value))
+            return self.expr_res(self.process_smoosh(value, context))
         if node_type == MAEK:
             return self.expr_res(self.process_expr_cast(value, context))
 
@@ -116,9 +105,9 @@ class Interpreter(object):
 
         return self.get_var(var_name, context)
 
-    def process_math_expr(self, op, args):
-        lhs = self.process_expr(args[0][1])
-        rhs = self.process_expr(args[1][1])
+    def process_math_expr(self, op, args, context):
+        lhs = self.process_expr(args[0][1], context)
+        rhs = self.process_expr(args[1][1], context)
 
         if op == SUM:
             return lhs + rhs
@@ -135,10 +124,10 @@ class Interpreter(object):
         if op == SMALLR:
             return min(lhs, rhs)
 
-    def process_logic_expr(self, op, args):
+    def process_logic_expr(self, op, args, context):
         if op in [BOTH, EITHER, WON]:
-            lhs = self.process_expr(args[0][1])
-            rhs = self.process_expr(args[1][1])
+            lhs = self.process_expr(args[0][1], context)
+            rhs = self.process_expr(args[1][1], context)
 
             if op == BOTH:
                 return lhs and rhs
@@ -147,27 +136,27 @@ class Interpreter(object):
             if op == WON:
                 return bool(lhs) ^ bool(rhs)
         if op == NOT:
-            lhs = self.process_expr(args[1])
+            lhs = self.process_expr(args[1], context)
             return not lhs
         if op == ALL or op == ANY:
-            exprs = [self.process_expr(arg[1]) for arg in args]
+            exprs = [self.process_expr(arg[1], context) for arg in args]
 
             if op == ALL:
                 return all(exprs)
             if op == ANY:
                 return any(exprs)
 
-    def process_equality(self, op, args):
-        lhs = self.process_expr(args[0][1])
-        rhs = self.process_expr(args[1][1])
+    def process_equality(self, op, args, context):
+        lhs = self.process_expr(args[0][1], context)
+        rhs = self.process_expr(args[1][1], context)
 
         if op == SAME:
             return lhs == rhs
         if op == DIFFRINT:
             return lhs != rhs
 
-    def process_smoosh(self, args):
-        str_args = ''.join([str(self.process_expr(arg[1])) for arg in args])
+    def process_smoosh(self, args, context):
+        str_args = ''.join([str(self.process_expr(arg[1]), context) for arg in args])
         return str_args
 
     def totype(self, t, val):
@@ -214,10 +203,10 @@ class Interpreter(object):
         context.vars[var_name] = value
     
     def process_assign_bukkit(self, args, context):
-        self.get_var(args[0][1], context)[args[1][1]] = self.process_expr(args[2][1])
+        self.get_var(args[0][1], context).vars[args[1][1]] = self.process_expr(args[2][1])
 
     def process_get_bukkit(self, args, context):
-        return self.get_var(args[0][1], context)[args[1][1]]
+        return self.get_var(args[0][1], context).vars[args[1][1]]
 
     def process_decl(self, args, context):
         var_name = args[0][1]
@@ -233,7 +222,7 @@ class Interpreter(object):
           elif t == TROOF:
             v = False
           elif t == BUKKIT:
-            v = {}
+            v = Bukkit(context.interpreter)
           else:
             raise Exception("INVALID TYPE FOR VARIABLE: " + t)
           context.vars[var_name] = v
@@ -270,9 +259,21 @@ class Interpreter(object):
                 self.process_statements(if_false)
 
     def process_function(self, args, context):
-        context.funcs[args[0]] = Function(context, args[1], args[2])
+        if args[0]:
+            context = context.get_var(args[0][1], context)
+        context.funcs[args[1]] = Function(context, context.interpreter, args[2], args[3])
     def execute_function(self, args, context):
-        context.funcs[args[0]].execute([self.process_expr(x[1], context) for x in args[1]])
+        if args[0]:
+            context = context.get_var(args[0][1], context)
+        try:
+            return context.funcs[args[1]].execute([self.process_expr(x[1], context) for x in args[2]])
+        except KeyError:
+            raise Exception("NO FUNCTION NAEMD " + args[1])
+    def process_return(self, args, context):
+        if args:
+            return self.process_expr(args[1], context)
+        else:
+            return None
 
     def process_loop(self, args, context):
         old_vars = dict(context.vars)
@@ -306,3 +307,24 @@ class Interpreter(object):
         print("An error occured:")
         print(e)
         self.lastError = sys.exc_info()
+
+class Bukkit():
+    def __init__(self, interpreter):
+        self.vars = {}
+        self.funcs = {}
+        self.interpreter = interpreter
+
+class Function():
+    def __init__(self, parent, interpreter, parameters, instructions):
+        self.instructions = instructions
+        self.vars = {}
+        self.funcs = {}
+        self.interpreter = interpreter
+        self.parent = parent
+        self.parameters = parameters
+    def execute(self, parameters):
+        if len(parameters) != len(self.parameters):
+            raise Exception("NOT ENUF PARAMETERS")
+        for c, p in enumerate(self.parameters):
+            self.vars[p[1][1]] = parameters[c]
+        return self.interpreter.process_statements(self.instructions, self)

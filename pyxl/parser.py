@@ -41,6 +41,7 @@ def p_command(p):
                | assign
                | if_else
                | function
+               | return
                | loop'''
     p[0] = p[1]
 
@@ -167,17 +168,36 @@ def p_sep_yr_args(p):
 
 def p_command_function(p):
     '''function : HOW IZ I ID YR sep_yr_args NEWLINE statements IF U SAY SO'''
-    p[0] = (FUNCTION, [p[4], p[6], p[8]])
+    p[0] = (FUNCTION, [None, p[4], p[6], p[8]])
 def p_command_function_no_args(p):
     '''function : HOW IZ I ID NEWLINE statements IF U SAY SO'''
-    p[0] = (FUNCTION, [p[4], p[6], []])
+    p[0] = (FUNCTION, [None, p[4], p[6], []])
+def p_command_bukkit_function(p):
+    '''function : HOW IZ variable ID YR sep_yr_args NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[3], p[4], p[6], p[8]])
+def p_command_bukkit_function_no_args(p):
+    '''function : HOW IZ variable ID NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[3], p[4], p[6], []])
 
 def p_expr_call_function(p):
     '''expr : I IZ ID YR sep_yr_args MKAY'''
-    p[0] = (FUNCTION_CALL, [p[3], p[5]])
+    p[0] = (EXPR, (FUNCTION_CALL, [None, p[3], p[5]]))
 def p_expr_call_function_no_args(p):
     '''expr : I IZ ID'''
-    p[0] = (FUNCTION_CALL, [p[3], []])
+    p[0] = (EXPR, (FUNCTION_CALL, [None, p[3], []]))
+def p_expr_call_bukkit_function(p):
+    '''expr : variable IZ ID YR sep_yr_args MKAY'''
+    p[0] = (EXPR, (FUNCTION_CALL, [p[1], p[3], p[5]]))
+def p_expr_call_bukkit_function_no_args(p):
+    '''expr : variable IZ ID'''
+    p[0] = (EXPR, (FUNCTION_CALL, [p[1], p[3], []]))
+
+def p_command_return_function(p):
+    '''return : FOUND YR expr'''
+    p[0] = (FUNCTION_RETURN, p[3])
+def p_command_return_function_none(p):
+    '''return : GTFO'''
+    p[0] = (FUNCTION_RETURN, None)
 
 def p_type(p):
     '''type : YARN
