@@ -37,8 +37,10 @@ def p_command(p):
                | call
                | cast
                | decl
+               | assign_bukkit
                | assign
                | if_else
+               | function
                | loop'''
     p[0] = p[1]
 
@@ -96,16 +98,25 @@ def p_command_elif(p):
 
 def p_command_decl(p):
     '''decl : I HAS A variable
-            | I HAS A variable ITZ value'''
+            | I HAS A variable ITZ expr
+            | I HAS A variable ITZ A type'''
     if len(p) == 5:
-        p[0] = (DECLARE, [p[4], None])
+        p[0] = (DECLARE, [p[4], None, False])
+    elif len(p) == 7:
+        p[0] = (DECLARE, [p[4], p[6], False])
     else:
-        p[0] = (DECLARE, [p[4], p[6]])
+      p[0] = (DECLARE, [p[4], p[7], True])
 
-
+def p_command_assign_bukkit(p):
+    '''assign_bukkit : variable HAS A variable ITZ expr'''
+    p[0] = (ASSIGN_BUKKIT, [p[1], p[4], p[6]])
 def p_command_assign(p):
     '''assign : variable R expr'''
     p[0] = (ASSIGN, [p[1], p[3]])
+
+def p_expr_get_bukkit(p):
+    '''expr : variable APOSTROPHE_Z variable'''
+    p[0] = (EXPR, (GET_BUKKIT, [p[1], p[3]]))
 
 
 def p_command_cast(p):
@@ -143,12 +154,37 @@ def p_sep_args(p):
         if p[3]:
             p[0].append(p[3])
 
+def p_sep_yr_args(p):
+    '''sep_yr_args : sep_yr_args AN YR expr
+            | expr'''
+    if len(p) == 2:
+        p[0] = [p[1]]
+    else:
+        p[0] = p[1] if p[1] else []
+
+        if p[4]:
+            p[0].append(p[4])
+
+def p_command_function(p):
+    '''function : HOW IZ I ID YR sep_yr_args NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[4], p[6], p[8]])
+def p_command_function_no_args(p):
+    '''function : HOW IZ I ID NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[4], p[6], []])
+
+def p_expr_call_function(p):
+    '''expr : I IZ ID YR sep_yr_args MKAY'''
+    p[0] = (FUNCTION_CALL, [p[3], p[5]])
+def p_expr_call_function_no_args(p):
+    '''expr : I IZ ID'''
+    p[0] = (FUNCTION_CALL, [p[3], []])
 
 def p_type(p):
     '''type : YARN
             | NUMBR
             | NUMBAR
-            | NOOB'''
+            | NOOB
+            | BUKKIT'''
     p[0] = p[1]
 
 
@@ -171,6 +207,10 @@ def p_value_bool(p):
     '''value : WIN
              | FAIL'''
     p[0] = (VALUE, (TROOF, p[1]))
+
+def p_value_dict(p):
+  '''value : DICT'''
+  p[0] = (VALUE, (BUKKIT, p[1]))
 
 
 def p_call_visible_newline(p):
@@ -298,7 +338,6 @@ def p_variable(p):
     '''variable : ID
                 | IT'''
     p[0] = (VAR, p[1])
-
 
 def p_program_error(p):
     '''program : error'''

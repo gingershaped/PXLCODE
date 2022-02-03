@@ -38,10 +38,12 @@ def repl():
       """)
     elif code == "/restart":
       print("==========INTERPRETER RESTART==========")
-      interpreter.restart()
+      interpreter.reset()
     elif code == "/memdump":
-      print("Memory dump:")
-      pp.pprint(interpreter.memory)
+        print("Memory dump:")
+        pp.pprint(interpreter.vars)
+        print("Function dump:")
+        pp.pprint([interpreter.funcs[x].vars for x in interpreter.funcs])
     elif code == "/autorestart":
       autorestart = not autorestart
       print("Autorestart", autorestart)

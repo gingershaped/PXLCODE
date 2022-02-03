@@ -8,11 +8,17 @@ keywords = (
     'A',  # assignment
     'ITZ',  # assignment
     'R',  # assignment
+    "HOW", # function
+    "IZ", # function
+    "IF", # function end
+    "U", # function end
+    "SAY", # function end
+    "SO", # function end
     'YARN',  # string type
     'NUMBR',  # integer type
     'NUMBAR',  # float type
     'TROOF',  # boolean type
-    'BUKKIT',  # array type
+    'BUKKIT',  # dict type
     'NOOB',  # untyped
     'WIN',  # true
     'FAIL',  # false
@@ -64,8 +70,7 @@ keywords = (
     'IT'  # special variable
 )
 
-tokens = keywords + ('QUESTION', 'EXCLAMATION', 'COMMA', 'INTEGER', 'FLOAT',
-                     'STRING', 'ID', 'NEWLINE', 'ELLIPSIS')
+tokens = keywords + ('QUESTION', 'EXCLAMATION', 'COMMA', 'INTEGER', 'DICT', 'FLOAT', 'STRING', 'ID', 'NEWLINE', 'ELLIPSIS', "APOSTROPHE_Z")
 
 t_ignore = ' \t'
 
@@ -76,6 +81,7 @@ t_INTEGER = r'\d+'
 t_FLOAT = r'((\d*\.\d+)(E[\+-]?\d+)?|([1-9]\d*E[\+-]?\d+))'
 t_STRING = r'\"(\\.|[^"\\])*\"'
 t_ELLIPSIS = r'\.\.\.'
+t_APOSTROPHE_Z = r'\'Z'
 
 
 def t_NEWLINE(t):
