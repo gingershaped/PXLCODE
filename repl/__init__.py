@@ -22,7 +22,7 @@ def repl():
     try:
       code = input(">>> ")
     except KeyboardInterrupt:
-      print("Goodbye!")
+      print("KTHXBYE!")
       exit()
     if code == "":
       pass
@@ -59,10 +59,10 @@ def repl():
       try:
         kc = open(name)
       except FileNotFoundError:
-        print("No such file:", name)
+        print("O NOES! CANT FIND FILE:", name)
         continue
       except OSError as e:
-        print("Error loading file \"", name, "\":", str(e))
+        print("SUMTHIG WENT WRONG WHILE LODING FILE \"", name, "\":", str(e))
         continue
       interpreter.fileName = " ".join(code.split(" ")[1:])
       program = kc.read()
