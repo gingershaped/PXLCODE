@@ -107,7 +107,7 @@ def t_ID(t):
 
 
 def t_error(t):
-    print("ILEGAL CHARACTER:", t.value[0])
+    print("ILEGAL CHARACTA:", t.value[0])
     t.lexer.skip(1)
 
 
