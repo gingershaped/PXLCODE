@@ -11,6 +11,7 @@ class Interpreter(object):
         self.funcs = {}
         self.it = None
         self.interpreter = self
+        self.exports = {}
 
     def interpret(self, ast):
         self.reset()
@@ -22,31 +23,45 @@ class Interpreter(object):
         if not len(statements):
           raise Exception("LOSE WHILE PARSE PROGRAM. MAEK SHUR U TYPE \"HAI\" AN \"KTHXBYE\" CORREKT.")
         for statement in statements:
-            node_type, value = statement
-            if node_type == EXPR:
-                self.process_expr(value, context)
-            if node_type == VISIBLE:
-                self.process_visible(value, context)
-            if node_type == GIMMEH:
-                self.process_gimmeh(value, context)
-            if node_type == ASSIGN:
-                self.process_assign(value, context)
-            if node_type == ASSIGN_BUKKIT:
-              self.process_assign_bukkit(value, context)
-            if node_type == DECLARE:
-                self.process_decl(value, context)
-            if node_type == DECLARE_BUKKIT:
-              self.process_decl_bukkit(value, context)
-            if node_type == CAST:
-                self.process_cast(value, context)
-            if node_type == IF_ELSE:
-                self.process_if_else(value, context)
-            if node_type == LOOP:
-                self.process_loop(value, context)
-            if node_type == FUNCTION:
-                self.process_function(value, context)
-            if node_type == FUNCTION_RETURN:
-                return self.process_return(value, context)
+            try:
+                node_type, value = statement
+                if node_type == EXPR:
+                    self.process_expr(value, context)
+                if node_type == VISIBLE:
+                    self.process_visible(value, context)
+                if node_type == GIMMEH:
+                    self.process_gimmeh(value, context)
+                if node_type == ASSIGN:
+                    self.process_assign(value, context)
+                if node_type == ASSIGN_BUKKIT:
+                  self.process_assign_bukkit(value, context)
+                if node_type == DECLARE:
+                    self.process_decl(value, context)
+                if node_type == DECLARE_BUKKIT_BLOCK:
+                    self.process_decl_bukkit_block(value, context)
+                if node_type == DECLARE_BUKKIT:
+                  self.process_decl_bukkit(value, context)
+                if node_type == CAST:
+                    self.process_cast(value, context)
+                if node_type == IF_ELSE:
+                    self.process_if_else(value, context)
+                if node_type == LOOP:
+                    self.process_loop(value, context)
+                if node_type == FUNCTION:
+                    self.process_function(value, context)
+                if node_type == FUNCTION_RETURN:
+                    return self.process_return(value, context)
+                if node_type == EXPORT:
+                    self.process_export(value, context)
+                if node_type == IMPORT:
+                    self.process_import(value, context)
+            except Exception as e:
+                print("An error occured:")
+                print(e)
+                print("in instruction:")
+                print(statement)
+                self.lastError = sys.exc_info()
+                return
 
     def expr_res(self, res):
         self.it = res
@@ -190,15 +205,15 @@ class Interpreter(object):
     def process_gimmeh(self, var, context):
         var_name = var[1]
         # check that variable exists
-        context.get_var(var_name)
+        context.get_var(var_name, context)
 
         context.vars[var_name] = input()
 
     def process_assign(self, args, context):
         var_name = args[0][1]
-        value = self.process_expr(args[1][1])
+        value = self.process_expr(args[1][1], context)
         # check that variable exists
-        context.get_var(var_name)
+        context.get_var(var_name, context)
 
         context.vars[var_name] = value
     
@@ -231,6 +246,50 @@ class Interpreter(object):
 
           context.vars[var_name] = value
 
+    def process_export(self, args, context):
+        for arg in args:
+            if arg[1][0] != "VARIABLE":
+                raise Exception(str(arg[1]) + " CANNOT EXPORT THAT!")
+            else:
+                try:
+                    v = self.get_var(arg[1][1], context)
+                except:
+                    v = self.funcs[arg[1][1]]
+                self.exports[arg[1][1]] = v
+    def process_import(self, path, context):
+        path = path[1:-1]
+        f = ""
+        for p in ["."] + __path__:
+            try:
+                f = open(p + "/" + path + ".pxl").read()
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                raise ImportError("ERROR OCCURED WHILE IMPORTING " + path + ": " + str(e)) from None
+            else:
+                break
+        if not f:
+            raise ImportError("NO SUCH FILE: " + path + ".pxl") from None
+        i = Interpreter()
+        i.run(f)
+        for o in i.exports:
+            if isinstance(i.exports[o], Function):
+                self.funcs[o] = i.exports[o]
+            else:
+                self.vars[o] = i.exports[o]
+
+    def process_decl_bukkit_block(self, args, context):
+        b = Bukkit(context)
+        for statement in args[1]:
+            node_type, value = statement
+            if node_type == DECLARE:
+                self.process_decl(value, b)
+            elif node_type == FUNCTION:
+                if value[0]:
+                    raise Exception("CANNOT DECLARE OWNED VARIABLE INSIDE BUKKIT BLOCK")
+                else:
+                    self.process_function(value, b)
+        context.vars[args[0][1]] = b
     def process_cast(self, args, context):
         var_name = args[0][1]
         t = args[1]
@@ -264,7 +323,7 @@ class Interpreter(object):
         context.funcs[args[1]] = Function(context, context.interpreter, args[2], args[3])
     def execute_function(self, args, context):
         if args[0]:
-            context = context.get_var(args[0][1], context)
+            context = context.interpreter.get_var(args[0][1], context)
         try:
             return context.funcs[args[1]].execute([self.process_expr(x[1], context) for x in args[2]])
         except KeyError:
@@ -276,7 +335,6 @@ class Interpreter(object):
             return None
 
     def process_loop(self, args, context):
-        old_vars = dict(context.vars)
         local_var_name = args[0][1]
         context.vars[local_var_name] = 0
 
@@ -294,37 +352,38 @@ class Interpreter(object):
         else:
             stop = lambda x: not x
 
-        while not stop(self.process_expr(cond)):
-            self.process_statements(statements)
+        while not stop(self.process_expr(cond, context)):
+            self.process_statements(statements, context)
             context.vars[local_var_name] = f(context.vars[local_var_name])
 
-        context.vars = old_vars
+        context.vars.pop(local_var_name)
 
     def run(self, code):
-      try:
         self.interpret(parse(code))
-      except Exception as e:
-        print("An error occured:")
-        print(e)
-        self.lastError = sys.exc_info()
+        
 
 class Bukkit():
     def __init__(self, interpreter):
-        self.vars = {}
+        self.vars = {"ME": self}
         self.funcs = {}
         self.interpreter = interpreter
 
 class Function():
-    def __init__(self, parent, interpreter, parameters, instructions):
+    def __init__(self, parent, interpreter, instructions, parameters):
         self.instructions = instructions
-        self.vars = {}
+        self.vars = {"ME": parent}
         self.funcs = {}
         self.interpreter = interpreter
         self.parent = parent
         self.parameters = parameters
     def execute(self, parameters):
         if len(parameters) != len(self.parameters):
-            raise Exception("NOT ENUF PARAMETERS")
+            raise Exception("WRONG NUMBR OF PARAMETERS: GOT " + str(len(parameters)) + " BUT EXPECTED " + str(len(self.parameters)))
         for c, p in enumerate(self.parameters):
             self.vars[p[1][1]] = parameters[c]
         return self.interpreter.process_statements(self.instructions, self)
+    def get_var(self, var_name, context):
+        if var_name in context.vars:
+            return context.vars[var_name]
+
+        raise Exception('variable {}: used before declaration'.format(var_name))
