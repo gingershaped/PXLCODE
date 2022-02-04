@@ -70,6 +70,9 @@ def p_condition(p):
 def p_command_import(p):
     '''import : CAN HAS PATH QUESTION'''
     p[0] = (IMPORT, p[3])
+def p_command_python_import(p):
+    '''import : CAN HAS SNEK PATH QUESTION'''
+    p[0] = (PY_IMPORT, p[4])
 def p_command_export(p):
     '''export : YOU CAN HAS sep_args MKAY'''
     p[0] = (EXPORT, p[4])
@@ -111,11 +114,14 @@ def p_command_elif(p):
 def p_command_decl(p):
     '''decl : I HAS A variable
             | I HAS A variable ITZ expr
-            | I HAS A variable ITZ A type'''
+            | I HAS A variable ITZ A type
+            | I HAS A variable ITZ LIEK A variable'''
     if len(p) == 5:
         p[0] = (DECLARE, [p[4], None, False])
     elif len(p) == 7:
         p[0] = (DECLARE, [p[4], p[6], False])
+    elif len(p) == 9:
+        p[0] = (DECLARE, [p[4], p[8], False])
     else:
       p[0] = (DECLARE, [p[4], p[7], True])
 def p_command_declare_bukkit_block(p):
@@ -260,16 +266,23 @@ def p_call_gimmeh(p):
 
 def p_expr_unary(p):
   '''expr : SIZE OF expr
-          | ABSLUT OF expr'''
+          | ABSLUT OF expr
+          | BINRY OF expr'''
   if p[1] == "SIZE":
     op = SIZE
   elif p[1] == "ABSLUT":
     op = ABSLUT
+  elif p[1] == "BINRY":
+      op = BINARY
   else:
     print('UNKNOW UNARY OPERATOR', p[1])
     p.parser.error = 1
     return
   p[0] = (EXPR, (op, p[3]))
+
+def p_expr_base(p):
+    '''expr : expr YR BASE ARE BELONG TO expr'''
+    p[0] = (BASE_CONVERT, [p[1], p[7]])
 
 def p_expr_value(p):
     '''expr : value'''

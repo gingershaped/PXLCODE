@@ -5,10 +5,12 @@ keywords = (
     'KTHXBYE',  # program end
     'I',  # assignment
     "CAN", # import
+    "SNEK", # import
     "YOU", # export
     'HAS',  # assignment
     'A',  # assignment
     'ITZ',  # assignment
+    'LIEK', # assignment
     'R',  # assignment
     "HOW", # function
     "IZ", # function
@@ -23,6 +25,11 @@ keywords = (
     'TROOF',  # boolean type
     'BUKKIT',  # table type
     "KTHX", # block bukkit end
+    "ARE", # base conversion,
+    "BASE",  # base conversion
+    "BELONG", # base conversion
+    "BINRY", # binary
+    "TO", # base conversion
     'NOOB',  # untyped
     'WIN',  # true
     'FAIL',  # false

@@ -1,6 +1,58 @@
 from .parser import parse
 from .constants import *
 import traceback, sys
+import os
+import importlib, importlib.util
+import inspect
+import json
+
+sys.setrecursionlimit(100000)
+sys.path.append(__path__[0])
+def buildSnek(mod, snek, level):
+    snek[level] = {"vars": {}, "funcs": {}}
+    discarded = 0
+    for name, method in inspect.getmembers(mod, inspect.isroutine):
+        try:
+            sig = inspect.signature(method)
+        except ValueError:
+            discarded += 1
+            continue
+        for f in sig.parameters:
+            p = sig.parameters[f]
+            if p.kind not in [p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD]:
+                discarded += 1
+                continue
+        snek[level]["funcs"][name] = {"parameters": len(sig.parameters)}
+    for name, const in inspect.getmembers(mod, lambda x: isinstance(x, (str, int, float))):
+        snek[level]["vars"][name] = const
+    for name, cls in inspect.getmembers(mod, inspect.isclass):
+        if not name in ["__class__", "__base__"]:
+            buildSnek(cls, snek, name)
+    
+
+def load_snek(mod, context):
+    f = None
+    try:
+        f = json.load(open(__path__[0] + "/__snek__/" + mod.__name__ + ".snek"))
+    except FileNotFoundError:
+        try:
+            os.mkdir(__path__[0] + "/__snek__")
+        except:
+            pass
+        snek = {}
+        buildSnek(mod, snek, mod.__name__)
+        f = snek
+        json.dump(snek, open(__path__[0] + "/__snek__/" + mod.__name__ + ".snek", "w"))
+        
+    for name, cls in zip(f.keys(), f.values()):
+        b = Bukkit(context)
+        b.vars.update(cls["vars"])
+        for n, f in zip(cls["funcs"].keys(), cls["funcs"].values()):
+            try:
+                b.funcs[n] = PyFunction(context, context.interpreter, mod.__dict__[n], f["parameters"])
+            except KeyError:
+                pass
+        context.vars[name] = b
 
 class Interpreter(object):
     def __int__(self, ast):
@@ -55,6 +107,8 @@ class Interpreter(object):
                     self.process_export(value, context)
                 if node_type == IMPORT:
                     self.process_import(value, context)
+                if node_type == PY_IMPORT:
+                    self.process_py_import(value, context)
             except Exception as e:
                 print("An error occured:")
                 print(e)
@@ -77,8 +131,8 @@ class Interpreter(object):
             return self.expr_res(self.process_variable(value, context))
         if node_type == GET_BUKKIT:
            return self.process_get_bukkit(value, context)
-        if node_type in [SIZE, ABSLUT]:
-          return self.expr_res(self.process_unary(node_type, value))
+        if node_type in [SIZE, ABSLUT, BINARY]:
+          return self.expr_res(self.process_unary(node_type, value, context))
         if node_type in [SUM, DIFF, PRODUKT, QUOSHUNT, MOD, BIGGR, SMALLR]:
             return self.expr_res(self.process_math_expr(node_type, value, context))
         if node_type in [BOTH, EITHER, WON, NOT, ALL, ANY]:
@@ -89,6 +143,8 @@ class Interpreter(object):
             return self.expr_res(self.process_smoosh(value, context))
         if node_type == MAEK:
             return self.expr_res(self.process_expr_cast(value, context))
+        if node_type == BASE_CONVERT:
+            return self.expr_res(self.process_base(value, context))
 
     def process_value(self, val):
         node_type, value = val
@@ -107,6 +163,8 @@ class Interpreter(object):
                 raise Exception('unknown value for TROOF type')
         if node_type == BUKKIT:
           return {}
+    def process_base(self, args, context):
+        return int(self.process_expr(args[0]), self.process_expr(args[1]))
 
     def get_var(self, var_name, context):
         if var_name in context.vars:
@@ -196,12 +254,13 @@ class Interpreter(object):
 
         print(to_print, end='\n' if new_line else '')
 
-    def process_unary(self, expr, obj):
-      if expr == SIZE:
-        return len(self.process_expr(obj[1]))
-      elif expr == ABSLUT:
-        return abs(self.process_expr(obj[1]))
-
+    def process_unary(self, expr, obj, context):
+        if expr == SIZE:
+            return len(self.process_expr(obj[1], context))
+        elif expr == ABSLUT:
+            return abs(self.process_expr(obj[1], context))
+        elif expr == BINARY:
+            return bin(self.process_expr(obj[1], context))[2:]
     def process_gimmeh(self, var, context):
         var_name = var[1]
         # check that variable exists
@@ -242,9 +301,14 @@ class Interpreter(object):
             raise Exception("INVALID TYPE FOR VARIABLE: " + t)
           context.vars[var_name] = v
         else:
-          value = None if args[1] is None else self.process_expr(args[1][1], context)
+            if args[1] == None:
+                value  = None
+            elif args[1][0] == "VARIABLE":
+                value = context.interpreter.get_var(args[1][1], context)
+            else:
+                value = self.process_expr(args[1][1], context)
 
-          context.vars[var_name] = value
+            context.vars[var_name] = value
 
     def process_export(self, args, context):
         for arg in args:
@@ -277,6 +341,13 @@ class Interpreter(object):
                 self.funcs[o] = i.exports[o]
             else:
                 self.vars[o] = i.exports[o]
+    def process_py_import(self, args, context):
+        path = args[1:-1]
+        if (spec := importlib.util.find_spec(path)) is not None:
+            mod = importlib.import_module(path)
+            load_snek(mod, context)
+        else:
+            raise Exception("NO SUCH MODULE: " + path)
 
     def process_decl_bukkit_block(self, args, context):
         b = Bukkit(context)
@@ -323,9 +394,9 @@ class Interpreter(object):
         context.funcs[args[1]] = Function(context, context.interpreter, args[2], args[3])
     def execute_function(self, args, context):
         if args[0]:
-            context = context.interpreter.get_var(args[0][1], context)
+            newContext = context.interpreter.get_var(args[0][1], context)
         try:
-            return context.funcs[args[1]].execute([self.process_expr(x[1], context) for x in args[2]])
+            return newContext.funcs[args[1]].execute([self.process_expr(x[1], context) for x in args[2]])
         except KeyError:
             raise Exception("NO FUNCTION NAEMD " + args[1])
     def process_return(self, args, context):
@@ -336,7 +407,11 @@ class Interpreter(object):
 
     def process_loop(self, args, context):
         local_var_name = args[0][1]
-        context.vars[local_var_name] = 0
+        _old_var = None
+        if local_var_name in context.vars:
+            _old_var = context.vars[local_var_name]
+        else:
+            context.vars[local_var_name] = 0
 
         if args[1] == UPPIN:
             f = lambda x: x + 1
@@ -355,8 +430,8 @@ class Interpreter(object):
         while not stop(self.process_expr(cond, context)):
             self.process_statements(statements, context)
             context.vars[local_var_name] = f(context.vars[local_var_name])
-
-        context.vars.pop(local_var_name)
+        if _old_var:
+            context.vars[local_var_name] = _old_var
 
     def run(self, code):
         self.interpret(parse(code))
@@ -387,3 +462,13 @@ class Function():
             return context.vars[var_name]
 
         raise Exception('variable {}: used before declaration'.format(var_name))
+class PyFunction:
+    def __init__(self, parent, interpreter, routine, parameters):
+        self.parent = parent
+        self.interpreter = interpreter
+        self.routine = routine
+        self.parameters = parameters
+    def execute(self, parameters):
+        if len(parameters) != self.parameters:
+            raise Exception("WRONG NUMBR OF PARAMETERS: GOT " + str(len(parameters)) + " BUT EXPECTED " + str(self.parameters))
+        return self.routine(*parameters)

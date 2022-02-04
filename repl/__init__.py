@@ -1,4 +1,4 @@
-from pyxl import Interpreter
+from pyxl import Interpreter, Bukkit
 import traceback, sys, pprint, os.path
 
 def run(code, interpreter, debug, autorestart):
@@ -44,6 +44,8 @@ def repl():
         pp.pprint(interpreter.vars)
         print("Function dump:")
         pp.pprint([interpreter.funcs[x].vars for x in interpreter.funcs])
+        print("BUKKIT dump:")
+        pp.pprint([(interpreter.vars[x].vars, interpreter.vars[x].funcs) for x in interpreter.vars if isinstance(interpreter.vars[x], Bukkit)])
     elif code == "/autorestart":
       autorestart = not autorestart
       print("Autorestart", autorestart)
