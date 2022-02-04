@@ -4,6 +4,8 @@ keywords = (
     'HAI',  # program start
     'KTHXBYE',  # program end
     'I',  # assignment
+    "CAN", # import
+    "YOU", # export
     'HAS',  # assignment
     'A',  # assignment
     'ITZ',  # assignment
@@ -14,11 +16,13 @@ keywords = (
     "U", # function end
     "SAY", # function end
     "SO", # function end
+    "FOUND", # function return
     'YARN',  # string type
     'NUMBR',  # integer type
     'NUMBAR',  # float type
     'TROOF',  # boolean type
-    'BUKKIT',  # dict type
+    'BUKKIT',  # table type
+    "KTHX", # block bukkit end
     'NOOB',  # untyped
     'WIN',  # true
     'FAIL',  # false
@@ -70,7 +74,7 @@ keywords = (
     'IT'  # special variable
 )
 
-tokens = keywords + ('QUESTION', 'EXCLAMATION', 'COMMA', 'INTEGER', 'DICT', 'FLOAT', 'STRING', 'ID', 'NEWLINE', 'ELLIPSIS', "APOSTROPHE_Z")
+tokens = keywords + ('QUESTION', 'EXCLAMATION', 'COMMA', 'INTEGER', 'DICT', 'FLOAT', 'STRING', 'ID', 'NEWLINE', 'ELLIPSIS', "APOSTROPHE_Z", "PATH")
 
 t_ignore = ' \t'
 
@@ -92,6 +96,10 @@ def t_NEWLINE(t):
 def t_oneline_comment(t):
     r'BTW .*(\n|\Z)'
     t.lineno += 1
+
+def t_PATH(t):
+    r'\{.*\}'
+    return t
 
 
 def t_multiline_comment(t):

@@ -2,6 +2,7 @@ from ply import *
 import pyxl.lexer as lexer
 from .constants import *
 from .errors import *
+import traceback
 
 tokens = lexer.tokens
 
@@ -39,9 +40,14 @@ def p_command(p):
                | decl
                | assign_bukkit
                | assign
+               | declare_bukkit_block
                | if_else
+               | bukkit_function
                | function
-               | loop'''
+               | return
+               | loop
+               | export
+               | import'''
     p[0] = p[1]
 
 
@@ -61,6 +67,12 @@ def p_condition(p):
                  | WILE'''
     p[0] = p[1]
 
+def p_command_import(p):
+    '''import : CAN HAS PATH QUESTION'''
+    p[0] = (IMPORT, p[3])
+def p_command_export(p):
+    '''export : YOU CAN HAS sep_args MKAY'''
+    p[0] = (EXPORT, p[4])
 
 def p_command_if_else(p):
     '''if_else : O RLY QUESTION NEWLINE YA RLY NEWLINE statements NO WAI NEWLINE statements OIC'''
@@ -106,6 +118,9 @@ def p_command_decl(p):
         p[0] = (DECLARE, [p[4], p[6], False])
     else:
       p[0] = (DECLARE, [p[4], p[7], True])
+def p_command_declare_bukkit_block(p):
+    '''declare_bukkit_block : O HAI IM variable NEWLINE statements KTHX'''
+    p[0] = (DECLARE_BUKKIT_BLOCK, [p[4], p[6]])
 
 def p_command_assign_bukkit(p):
     '''assign_bukkit : variable HAS A variable ITZ expr'''
@@ -165,19 +180,38 @@ def p_sep_yr_args(p):
         if p[4]:
             p[0].append(p[4])
 
+def p_command_bukkit_function(p):
+    '''bukkit_function : HOW IZ variable ID YR sep_yr_args NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[3], p[4], p[8], p[6]])
+def p_command_bukkit_function_no_args(p):
+    '''bukkit_function : HOW IZ variable ID NEWLINE statements IF U SAY SO'''
+    p[0] = (FUNCTION, [p[3], p[4], p[6], []])
 def p_command_function(p):
     '''function : HOW IZ I ID YR sep_yr_args NEWLINE statements IF U SAY SO'''
-    p[0] = (FUNCTION, [p[4], p[6], p[8]])
+    p[0] = (FUNCTION, [None, p[4], p[8], p[6]])
 def p_command_function_no_args(p):
     '''function : HOW IZ I ID NEWLINE statements IF U SAY SO'''
-    p[0] = (FUNCTION, [p[4], p[6], []])
+    p[0] = (FUNCTION, [None, p[4], p[6], []])
 
 def p_expr_call_function(p):
     '''expr : I IZ ID YR sep_yr_args MKAY'''
-    p[0] = (FUNCTION_CALL, [p[3], p[5]])
+    p[0] = (EXPR, (FUNCTION_CALL, [None, p[3], p[5]]))
 def p_expr_call_function_no_args(p):
     '''expr : I IZ ID'''
-    p[0] = (FUNCTION_CALL, [p[3], []])
+    p[0] = (EXPR, (FUNCTION_CALL, [None, p[3], []]))
+def p_expr_call_bukkit_function(p):
+    '''expr : variable IZ ID YR sep_yr_args MKAY'''
+    p[0] = (EXPR, (FUNCTION_CALL, [p[1], p[3], p[5]]))
+def p_expr_call_bukkit_function_no_args(p):
+    '''expr : variable IZ ID'''
+    p[0] = (EXPR, (FUNCTION_CALL, [p[1], p[3], []]))
+
+def p_command_return_function(p):
+    '''return : FOUND YR expr'''
+    p[0] = (FUNCTION_RETURN, p[3])
+def p_command_return_function_none(p):
+    '''return : GTFO'''
+    p[0] = (FUNCTION_RETURN, None)
 
 def p_type(p):
     '''type : YARN
@@ -355,6 +389,7 @@ def p_empty(p):
 def p_error(p):
     if not p:
         print("O NOES! SUMTHIN'S GON HORIBLY WRONG. DID U MAEK A TYPO?")
+        traceback.print_exc()
 
 
 bparser = yacc.yacc()
