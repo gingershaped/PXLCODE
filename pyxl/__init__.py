@@ -110,8 +110,9 @@ class Interpreter(object):
                 if node_type == PY_IMPORT:
                     self.process_py_import(value, context)
             except Exception as e:
-                print("An error occured:")
+                print("O NOES! AN EROR OCCURD:")
                 print(e)
+                self.lastError = sys.exc_info()
                 print("in instruction:")
                 print(statement)
                 self.lastError = sys.exc_info()
@@ -160,7 +161,7 @@ class Interpreter(object):
             elif value == FAIL:
                 return False
             else:
-                raise Exception('unknown value for TROOF type')
+                raise Exception('DONT KNO VARIABLE FOR TROOF TYP')
         if node_type == BUKKIT:
           return {}
     def process_base(self, args, context):
@@ -170,7 +171,7 @@ class Interpreter(object):
         if var_name in context.vars:
             return context.vars[var_name]
 
-        raise Exception('variable {}: used before declaration'.format(var_name))
+        raise Exception('VARIABLE {}: USED BFOR DECLARATIN'.format(var_name))
 
     def process_variable(self, var_name, context):
         if var_name == 'IT':
@@ -298,7 +299,7 @@ class Interpreter(object):
           elif t == BUKKIT:
             v = Bukkit(context.interpreter)
           else:
-            raise Exception("INVALID TYPE FOR VARIABLE: " + t)
+            raise Exception("INVALID TYP FOUR VARIABLE: " + t)
           context.vars[var_name] = v
         else:
             if args[1] == None:
@@ -453,7 +454,7 @@ class Function():
         self.parameters = parameters
     def execute(self, parameters):
         if len(parameters) != len(self.parameters):
-            raise Exception("WRONG NUMBR OF PARAMETERS: GOT " + str(len(parameters)) + " BUT EXPECTED " + str(len(self.parameters)))
+            raise Exception("WRONG NUMBR OF PARAMETUHS: GOT " + str(len(parameters)) + " BUT EXPECTED " + str(len(self.parameters)))
         for c, p in enumerate(self.parameters):
             self.vars[p[1][1]] = parameters[c]
         return self.interpreter.process_statements(self.instructions, self)
